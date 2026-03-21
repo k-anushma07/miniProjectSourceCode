@@ -3,6 +3,10 @@
 // be placed in the file, and deletes data previously in the file.
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
+void viewTransactions(void);
+void recordTransaction(unsigned int account, double amount, char type[]);
 // clientData structure definition
 struct clientData
 {
@@ -11,6 +15,14 @@ struct clientData
     char firstName[10];   // account first name
     double balance;       // account balance
 };                        // end structure clientData
+// transaction structure definition
+struct transactionData
+{
+    unsigned int acctNum;
+    double amount;
+    char type[10];   // Deposit or Withdraw
+    char date[30];   // Date and time string
+};
 
 // prototypes
 unsigned int enterChoice(void);
@@ -32,7 +44,7 @@ int main(int argc, char *argv[])
     }
 
     // enable user to specify action
-    while ((choice = enterChoice()) != 5)
+    while ((choice = enterChoice()) != 6)
     {
         switch (choice)
         {
@@ -51,6 +63,10 @@ int main(int argc, char *argv[])
         // delete existing record
         case 4:
             deleteRecord(cfPtr);
+            break;
+        // transaction details
+        case 5:
+            viewTransactions();
             break;
         // display if user does not select valid choice
         default:
@@ -127,11 +143,16 @@ void updateRecord(FILE *fPtr)
         scanf("%lf", &transaction);
         client.balance += transaction; // update record balance
 
+        if (transaction > 0)
+             recordTransaction(account, transaction, "Deposit");
+        else
+             recordTransaction(account, transaction, "Withdraw");
+
         printf("%-6d%-16s%-11s%10.2f\n", client.acctNum, client.lastName, client.firstName, client.balance);
 
         // move file pointer to correct record in file
         // move back by 1 record length
-        fseek(fPtr, -sizeof(struct clientData), SEEK_CUR);
+        fseek(fPtr, -(long)sizeof(struct clientData), SEEK_CUR);
         // write updated record over old record in file
         fwrite(&client, sizeof(struct clientData), 1, fPtr);
     } // end else
@@ -199,7 +220,74 @@ void newRecord(FILE *fPtr)
         fwrite(&client, sizeof(struct clientData), 1, fPtr);
     } // end else
 } // end function newRecord
+#include <time.h>
 
+void recordTransaction(unsigned int account, double amount, char type[])
+{
+    FILE *tPtr;
+    struct transactionData trans;
+    time_t currentTime;
+    struct tm *localTime;
+
+    // open file in append mode
+    if ((tPtr = fopen("transactions.dat", "ab")) == NULL)
+    {
+        printf("Transaction file could not be opened.\n");
+        return;
+    }
+
+    trans.acctNum = account;
+    trans.amount = amount;
+    strcpy(trans.type, type);
+
+    // get current time
+    time(&currentTime);
+    localTime = localtime(&currentTime);
+    strftime(trans.date, 30, "%Y-%m-%d %H:%M:%S", localTime);
+
+    // write to file
+    fwrite(&trans, sizeof(struct transactionData), 1, tPtr);
+
+    fclose(tPtr);
+}
+void viewTransactions(void)
+{
+    FILE *tPtr;
+    struct transactionData trans;
+    unsigned int account;
+    int found = 0;
+
+    printf("Enter account number to view transactions: ");
+    scanf("%u", &account);
+
+    if ((tPtr = fopen("transactions.dat", "rb")) == NULL)
+    {
+        printf("No transaction file found.\n");
+        return;
+    }
+
+    printf("\nTransaction History for Account %d\n", account);
+    printf("-----------------------------------------------------\n");
+    printf("%-12s %-12s %-20s\n", "Type", "Amount", "Date");
+    printf("-----------------------------------------------------\n");
+
+    while (fread(&trans, sizeof(struct transactionData), 1, tPtr))
+    {
+        if (trans.acctNum == account)
+        {
+            printf("%-12s %-12.2f %-20s\n",
+                   trans.type,
+                   trans.amount,
+                   trans.date);
+            found = 1;
+        }
+    }
+
+    if (!found)
+        printf("No transactions found for this account.\n");
+
+    fclose(tPtr);
+}
 // enable user to input menu choice
 unsigned int enterChoice(void)
 {
@@ -211,7 +299,8 @@ unsigned int enterChoice(void)
                  "2 - update an account\n"
                  "3 - add a new account\n"
                  "4 - delete an account\n"
-                 "5 - end program\n? ");
+                 "5 - view transaction history\n"
+                 "6 - end program\n? ");
 
     scanf("%u", &menuChoice); // receive choice from user
     return menuChoice;
