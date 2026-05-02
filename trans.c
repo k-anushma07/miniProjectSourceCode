@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+void miniStatement(void);
 void viewTransactions(void);
 void recordTransaction(unsigned int account, double amount, char type[]);
 // clientData structure definition
@@ -45,7 +46,7 @@ int main(int argc, char *argv[])
     }
 
     // enable user to specify action
-    while ((choice = enterChoice()) != 7)
+    while ((choice = enterChoice()) != 8)
     {
         switch (choice)
         {
@@ -72,6 +73,10 @@ int main(int argc, char *argv[])
         // search feature
         case 6:
             searchRecord(cfPtr);
+            break;
+        // mini statement
+        case 7:
+            miniStatement();
             break;
         // display if user does not select valid choice
         default:
@@ -293,6 +298,67 @@ void viewTransactions(void)
 
     fclose(tPtr);
 }
+void miniStatement(void)
+{
+    FILE *tPtr;
+    struct transactionData trans;
+    unsigned int account;
+    int count = 0, i;
+
+    // To store last 5 transactions
+    struct transactionData last[5];
+
+    printf("Enter account number: ");
+    scanf("%u", &account);
+
+    if ((tPtr = fopen("transactions.dat", "rb")) == NULL)
+    {
+        printf("No transaction file found.\n");
+        return;
+    }
+
+    // Read all transactions and keep only last 5
+    while (fread(&trans, sizeof(struct transactionData), 1, tPtr))
+    {
+        if (trans.acctNum == account)
+        {
+            if (count < 5)
+            {
+                last[count++] = trans;
+            }
+            else
+            {
+                // Shift left and add new at end
+                for (i = 0; i < 4; i++)
+                {
+                    last[i] = last[i + 1];
+                }
+                last[4] = trans;
+            }
+        }
+    }
+
+    fclose(tPtr);
+
+    if (count == 0)
+    {
+        printf("No transactions found for this account.\n");
+        return;
+    }
+
+    printf("\nLast %d Transactions for Account %d\n", count, account);
+    printf("-----------------------------------------------------\n");
+    printf("%-12s %-12s %-20s\n", "Type", "Amount", "Date");
+    printf("-----------------------------------------------------\n");
+
+    for (i = 0; i < count; i++)
+    {
+        printf("%-12s %-12.2f %-20s\n",
+               last[i].type,
+               last[i].amount,
+               last[i].date);
+    }
+}
 void searchRecord(FILE *fPtr)
 {
     struct clientData client;
@@ -380,7 +446,8 @@ unsigned int enterChoice(void)
                  "4 - delete an account\n"
                  "5 - view transaction history\n"
                  "6 - search account\n"
-                 "7 - end program\n? ");
+                 "7 - mini statement\n"
+                 "8 - end program\n? ");
 
     scanf("%u", &menuChoice); // receive choice from user
     return menuChoice;
